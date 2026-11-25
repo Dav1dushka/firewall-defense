@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Firewall Defense · a game about writing firewall rules</title>
+<meta name="description" content="Packets are coming. Write firewall rules that let real users in and keep attackers out. Eight levels: default deny, rule order, stateful filtering, spoofing, rate limits.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='13' y='2' width='6' height='28' rx='2' fill='%23ff9f1c'/%3E%3Ccircle cx='6' cy='11' r='3' fill='%23f72585'/%3E%3Ccircle cx='26' cy='21' r='3' fill='%234cc9f0'/%3E%3C/svg%3E">
+<style>
+  :root { color-scheme: dark; --bg: #0a0f22; --panel: #111833; --panel2: #0d1430; --line: rgba(226,232,255,.1);
+    --ink: #e8ecff; --mute: #98a2c9; --wall: #ff9f1c; --legit: #4cc9f0; --attack: #f72585; --ok: #4ade80; --bad: #ffd166;
+    --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace; --sans: "Space Grotesk", system-ui, sans-serif; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: radial-gradient(60% 40% at 50% 0%, #1a2350 0%, var(--bg) 70%) fixed, var(--bg);
+    color: var(--ink); font: 15px/1.55 var(--sans); }
+  code { font-family: var(--mono); font-size: .92em; }
+  button { font: inherit; color: inherit; cursor: pointer; }
+  a { color: var(--legit); }
+  .mute { color: var(--mute); font-weight: 400; }
+  .legit { color: var(--legit); }
+  .attack { color: var(--attack); }
+
+  header { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; padding: 14px clamp(14px, 3vw, 28px);
+    border-bottom: 1px solid var(--line); background: rgba(10,15,34,.7); backdrop-filter: blur(8px); position: sticky; top: 0; z-index: 5; }
+  .logo { display: flex; align-items: center; gap: 10px; font: 700 20px var(--sans); letter-spacing: .04em; text-transform: uppercase; margin-right: auto; }
+  .logo i { width: 8px; height: 26px; border-radius: 3px; background: linear-gradient(var(--wall), #c46d0c); box-shadow: 0 0 18px rgba(255,159,28,.6); }
+  .logo span { color: var(--wall); }
+  #levels { display: flex; gap: 6px; flex-wrap: wrap; }
+  .chip { display: grid; justify-items: center; min-width: 44px; padding: 4px 8px; border-radius: 10px; border: 1px solid var(--line); background: var(--panel); line-height: 1.15; }
+  .chip b { font-size: 15px; }
+  .chip i { font-style: normal; font-size: 10px; color: var(--wall); letter-spacing: 1px; }
+  .chip i s { text-decoration: none; opacity: .28; }
+  .chip.on { border-color: var(--wall); box-shadow: 0 0 0 1px var(--wall) inset; }
+  .gh { color: var(--mute); font-size: 13px; text-decoration: none; }
+  .gh:hover { color: var(--ink); }
+
+  main { display: grid; grid-template-columns: minmax(340px, 440px) 1fr; gap: 20px; padding: 20px clamp(14px, 3vw, 28px) 40px; max-width: 1500px; margin: 0 auto; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 18px; }
+  .left { display: grid; gap: 16px; align-content: start; }
+  #level-no { color: var(--wall); font: 700 12px var(--mono); text-transform: uppercase; letter-spacing: .08em; }
+  h1 { font: 700 28px/1.1 var(--sans); margin: 4px 0 10px; }
+  #story p { margin: 0 0 10px; color: #cfd6f5; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; margin: 6px 0 10px; }
+  td { padding: 6px 6px 6px 0; border-top: 1px solid var(--line); vertical-align: top; }
+  td:first-child { white-space: nowrap; color: var(--legit); }
+  #goals { font-size: 13px; color: var(--mute); margin: 0; }
+  #goals b { color: var(--ink); }
+
+  .editor-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
+  .editor-head span { font: 700 12px var(--mono); color: var(--mute); }
+  .editor { display: grid; grid-template-columns: 34px 1fr; border: 1px solid var(--line); border-radius: 12px; background: var(--panel2); overflow: hidden; height: 230px; }
+  .editor:focus-within { border-color: rgba(255,159,28,.6); }
+  #gutter { overflow: hidden; padding: 12px 0; text-align: right; font: 13px/21px var(--mono); color: rgba(152,162,201,.5); user-select: none; }
+  #gutter span { display: block; padding-right: 8px; }
+  #gutter span.bad { color: #fff; background: rgba(255,77,109,.55); }
+  #rules { border: 0; outline: 0; resize: none; background: transparent; color: var(--ink); font: 13px/21px var(--mono); padding: 12px 12px 12px 8px; white-space: pre; overflow: auto; tab-size: 2; }
+  .status { font: 12px var(--mono); color: var(--mute); margin-top: 8px; min-height: 18px; }
+  .status.error { color: #ff8fa3; }
+  .actions { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; align-items: center; }
+  .go { min-height: 42px; padding: 0 16px; border-radius: 11px; border: 1px solid var(--line); background: #18224a; font-weight: 700; }
+  .go.primary { background: linear-gradient(180deg, #ffb347, #ff8f1c); color: #1b1100; border: 0; }
+  .go:disabled { opacity: .45; cursor: not-allowed; }
+  .go:hover:not(:disabled) { filter: brightness(1.1); }
+  .actions kbd { font: 11px var(--mono); color: var(--mute); }
+  #hint { margin: 12px 0 0; padding: 10px 12px; border-left: 3px solid var(--wall); background: rgba(255,159,28,.08); border-radius: 0 8px 8px 0; font-size: 14px; }
+  details.ref summary { cursor: pointer; font-weight: 700; }
+  details.ref dl { display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; margin: 12px 0 0; font-size: 13px; }
+  details.ref dt { font-family: var(--mono); color: var(--wall); white-space: nowrap; }
+  details.ref dd { margin: 0; color: #cfd6f5; }
+
+  .right { display: grid; gap: 16px; align-content: start; min-width: 0; }
+  .stage-wrap { position: relative; padding: 0; overflow: hidden; }
+  #stage { display: block; width: 100%; aspect-ratio: 16 / 8.2; }
+  .stage-bar { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; padding: 10px 16px; border-top: 1px solid var(--line); font: 12px var(--mono); min-height: 44px; }
+  #live { display: flex; gap: 16px; flex-wrap: wrap; margin-right: auto; }
+  .stage-bar label { color: var(--mute); display: flex; gap: 6px; align-items: center; }
+  #skip { min-height: 28px; padding: 0 10px; border-radius: 8px; border: 1px solid var(--line); background: transparent; font-size: 12px; }
+
+  #results:empty { display: none; }
+  .verdict { border-radius: 14px; padding: 14px 16px; margin-bottom: 14px; }
+  .verdict.pass { background: rgba(74,222,128,.08); border: 1px solid rgba(74,222,128,.35); }
+  .verdict.fail { background: rgba(255,77,109,.08); border: 1px solid rgba(255,77,109,.35); }
+  .verdict h3 { margin: 0 0 6px; font-size: 20px; }
+  .verdict p { margin: 0 0 10px; }
+  .stars { color: var(--wall); letter-spacing: 2px; margin-left: 6px; }
+  .meters { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 16px; }
+  .meter-top { display: flex; justify-content: space-between; font-size: 13px; }
+  .meter-top b { font: 700 18px var(--mono); }
+  .meter.low .meter-top b { color: #ff8fa3; }
+  .meter.ok .meter-top b { color: var(--ok); }
+  .bar { position: relative; height: 8px; border-radius: 6px; background: rgba(255,255,255,.08); margin: 6px 0 4px; }
+  .bar i { position: absolute; inset: 0 auto 0 0; border-radius: 6px; }
+  .bar i.legit { background: var(--legit); }
+  .bar i.attack { background: var(--attack); }
+  .bar u { position: absolute; top: -4px; bottom: -4px; width: 2px; background: #fff; text-decoration: none; }
+  .meter small { color: var(--mute); font-size: 11px; }
+  h4 { margin: 0 0 8px; font-size: 14px; }
+  .rows { display: grid; gap: 6px; }
+  .row { border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; background: var(--panel2); }
+  .row.bad { border-color: rgba(255,209,102,.45); }
+  .row summary { display: grid; grid-template-columns: 14px 1fr auto auto; gap: 10px; align-items: center; cursor: pointer; font-size: 14px; list-style: none; }
+  .row summary::-webkit-details-marker { display: none; }
+  .row summary i { font-style: normal; }
+  .row summary i.legit { color: var(--legit); }
+  .row summary i.attack { color: var(--attack); }
+  .row summary em { font: 12px var(--mono); color: var(--mute); font-style: normal; }
+  .row.good summary b { color: var(--ok); }
+  .row.bad summary b { color: var(--bad); font-size: 12px; }
+  .row p { margin: 8px 0 0 24px; font-size: 13px; color: #cfd6f5; overflow-wrap: anywhere; }
+
+  footer { text-align: center; color: var(--mute); font-size: 12px; padding: 0 0 30px; }
+  footer a { color: var(--mute); }
+
+  @media (max-width: 980px) {
+    main { grid-template-columns: 1fr; }
+    .right { order: -1; }
+    .meters { grid-template-columns: 1fr; }
+    #stage { aspect-ratio: 4 / 3.2; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="logo"><i></i>Firewall <span>Defense</span></div>
+  <nav id="levels" aria-label="Levels"></nav>
+  <a class="gh" href="https://github.com/Dav1dushka/firewall-defense">GitHub ↗</a>
+</header>
+
+<main>
+  <section class="left">
+    <div class="panel">
+      <div id="level-no"></div>
+      <h1 id="level-title"></h1>
+      <div id="story"></div>
+      <table><tbody id="services"></tbody></table>
+      <p id="goals"></p>
+    </div>
+
+    <div class="panel">
+      <div class="editor-head"><b>Your rules</b><span>firewall.rules</span></div>
+      <div class="editor">
+        <div id="gutter" aria-hidden="true"></div>
+        <textarea id="rules" spellcheck="false" autocapitalize="off" autocomplete="off" aria-label="Firewall rules"></textarea>
+      </div>
+      <div id="status" class="status" aria-live="polite"></div>
+      <div class="actions">
+        <button class="go primary" id="run">▶ Run wave</button>
+        <button class="go" id="hint-btn">Hint</button>
+        <button class="go" id="reset">Reset</button>
+        <kbd>Ctrl+Enter runs</kbd>
+      </div>
+      <p id="hint" hidden></p>
+    </div>
+
+    <details class="panel ref">
+      <summary>Rule language</summary>
+      <dl>
+        <dt>allow / drop</dt><dd>What to do with a packet that matches. Every condition after it must match.</dd>
+        <dt>policy drop</dt><dd>What happens to packets that no rule matched. Starts as <code>allow</code>.</dd>
+        <dt>tcp · udp · icmp</dt><dd>Protocol.</dd>
+        <dt>port 22</dt><dd>Destination port: <code>22</code>, <code>80,443</code> or <code>1024-65535</code>. Needs tcp or udp.</dd>
+        <dt>sport 53</dt><dd>Source port. The sender chooses it freely.</dd>
+        <dt>from 10.0.0.0/8</dt><dd>Source address or network.</dd>
+        <dt>in wan · in lan</dt><dd>Interface the packet arrived on: <code>wan</code> is the internet, <code>lan</code> the internal network.</dd>
+        <dt>state established</dt><dd>Reply to a connection the server opened itself. <code>state new</code> is everything else.</dd>
+        <dt>limit 3/m per-src</dt><dd>Match at most 3 packets a minute (<code>/s</code> per second), counted per source address. Extra packets skip this rule and go on to the next one.</dd>
+        <dt># comment</dt><dd>Ignored.</dd>
+      </dl>
+    </details>
+  </section>
+
+  <section class="right">
+    <div class="panel stage-wrap">
+      <canvas id="stage" aria-label="Animation of packets reaching the firewall"></canvas>
+      <div class="stage-bar">
+        <div id="live" aria-live="off"></div>
+        <label><input type="checkbox" id="speed"> fast</label>
+        <button id="skip" hidden>skip ⏭</button>
+      </div>
+    </div>
+    <div id="results" class="panel" aria-live="polite"></div>
+  </section>
+</main>
+
+<footer>Firewall Defense · runs entirely in your browser · <a href="https://github.com/Dav1dushka/firewall-defense">source on GitHub</a></footer>
+<script src="game.js"></script>
+</body>
+</html>
